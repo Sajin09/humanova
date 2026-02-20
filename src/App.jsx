@@ -1,9 +1,20 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Copy, CheckCircle2, ShieldCheck, Terminal,
-  UserCheck, Eraser, Settings, X, Key, AlertTriangle, ExternalLink, Zap
-} from 'lucide-react';
+  Sparkles,
+  Copy,
+  CheckCircle2,
+  ShieldCheck,
+  Terminal,
+  UserCheck,
+  Eraser,
+  Settings,
+  X,
+  Key,
+  AlertTriangle,
+  ExternalLink,
+  Zap,
+} from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
 // FREE Groq API  –  gives access to Llama 3 models (free, fast)
@@ -12,19 +23,22 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [processStep, setProcessStep] = useState('Ready');
-  const [error, setError] = useState('');
+  const [processStep, setProcessStep] = useState("Ready");
+  const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(
-    () => localStorage.getItem('groq_api_key') || ''
+    () => localStorage.getItem("groq_api_key") || "",
   );
   const [stats, setStats] = useState({
-    humanScore: 0, readability: 0, aiProbability: 0, wordCount: 0
+    humanScore: 0,
+    readability: 0,
+    aiProbability: 0,
+    wordCount: 0,
   });
 
   const debounceRef = useRef(null);
@@ -32,7 +46,7 @@ export default function App() {
 
   // Persist key
   useEffect(() => {
-    localStorage.setItem('groq_api_key', apiKey);
+    localStorage.setItem("groq_api_key", apiKey);
   }, [apiKey]);
 
   // Real-time debounced trigger
@@ -86,65 +100,66 @@ OUTPUT RULES:
     abortRef.current = new AbortController();
 
     setIsProcessing(true);
-    setError('');
-    setOutput('');
+    setError("");
+    setOutput("");
     setProgress(0);
 
     try {
-      let resultText = '';
+      let resultText = "";
       const wordCount = input.split(/\s+/).filter(Boolean).length;
 
       if (apiKey) {
         // ── REAL API CALL via Groq ──────────────────────────
-        setProcessStep('Connecting to Groq AI...');
+        setProcessStep("Connecting to Groq AI...");
         setProgress(15);
 
-        const res = await fetch('/api/groq/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
+        const res = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "llama-3.3-70b-versatile",
+              messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: input },
+              ],
+              temperature: 1.0,
+              max_tokens: 2048,
+              top_p: 0.95,
+            }),
+            signal: abortRef.current.signal,
           },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: input },
-            ],
-            temperature: 1.0,
-            max_tokens: 2048,
-            top_p: 0.95,
-          }),
-          signal: abortRef.current.signal,
-        });
-
+        );
         setProgress(65);
-        setProcessStep('Processing AI response...');
+        setProcessStep("Processing AI response...");
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(
-            errData?.error?.message || `Groq API error ${res.status}`
+            errData?.error?.message || `Groq API error ${res.status}`,
           );
         }
 
         const data = await res.json();
-        resultText = data?.choices?.[0]?.message?.content?.trim() || '';
+        resultText = data?.choices?.[0]?.message?.content?.trim() || "";
 
-        if (!resultText) throw new Error('Empty response from Groq API');
-
+        if (!resultText) throw new Error("Empty response from Groq API");
       } else {
         // ── LOCAL FALLBACK (no API key) ─────────────────────
-        setProcessStep('Running local humanizer...');
+        setProcessStep("Running local humanizer...");
         setProgress(20);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
         setProgress(60);
         resultText = localHumanize(input);
         setProgress(90);
       }
 
       // Stream the result
-      setProcessStep('Streaming output...');
+      setProcessStep("Streaming output...");
       await streamOutput(resultText);
 
       setStats({
@@ -154,12 +169,11 @@ OUTPUT RULES:
         wordCount,
       });
       setProgress(100);
-      setProcessStep('✅ Stealth Mode Active');
-
+      setProcessStep("✅ Stealth Mode Active");
     } catch (err) {
-      if (err.name === 'AbortError') return; // user typed again, ignore
+      if (err.name === "AbortError") return; // user typed again, ignore
       setError(err.message);
-      setProcessStep('❌ Error');
+      setProcessStep("❌ Error");
     } finally {
       setIsProcessing(false);
     }
@@ -168,42 +182,54 @@ OUTPUT RULES:
   // ─── LOCAL FALLBACK HUMANIZER ─────────────────────────────
   function localHumanize(text) {
     const swaps = {
-      'moreover': 'also', 'furthermore': 'also',
-      'additionally': 'also', 'therefore': 'so',
-      'consequently': 'because of this', 'thus': 'so',
-      'however': 'but', 'nevertheless': 'but still',
-      'in conclusion': 'at the end', 'in summary': 'overall',
-      'utilize': 'use', 'demonstrates': 'shows',
-      'illustrates': 'shows', 'implement': 'set up',
-      'facilitate': 'help', 'prioritize': 'focus on',
-      'leverage': 'use', 'commence': 'start',
-      'obtain': 'get', 'approximately': 'about',
-      'it is important to note that': '', 'it is worth noting that': '',
-      'in order to': 'to', 'due to the fact that': 'because',
-      'a significant number of': 'many',
-      'a wide range of': 'many different',
-      'plays a crucial role': 'is important',
-      'it should be noted that': '',
-      'on the other hand': 'but then',
+      moreover: "also",
+      furthermore: "also",
+      additionally: "also",
+      therefore: "so",
+      consequently: "because of this",
+      thus: "so",
+      however: "but",
+      nevertheless: "but still",
+      "in conclusion": "at the end",
+      "in summary": "overall",
+      utilize: "use",
+      demonstrates: "shows",
+      illustrates: "shows",
+      implement: "set up",
+      facilitate: "help",
+      prioritize: "focus on",
+      leverage: "use",
+      commence: "start",
+      obtain: "get",
+      approximately: "about",
+      "it is important to note that": "",
+      "it is worth noting that": "",
+      "in order to": "to",
+      "due to the fact that": "because",
+      "a significant number of": "many",
+      "a wide range of": "many different",
+      "plays a crucial role": "is important",
+      "it should be noted that": "",
+      "on the other hand": "but then",
     };
     let out = text;
     for (const [ai, human] of Object.entries(swaps)) {
-      out = out.replace(new RegExp(`\\b${ai}\\b`, 'gi'), human);
+      out = out.replace(new RegExp(`\\b${ai}\\b`, "gi"), human);
     }
     // Clean up double spaces from empty replacements
-    out = out.replace(/ {2,}/g, ' ').replace(/\. {2,}/g, '. ');
+    out = out.replace(/ {2,}/g, " ").replace(/\. {2,}/g, ". ");
     return out.trim();
   }
 
   // ─── WORD-BY-WORD STREAMING ───────────────────────────────
   const streamOutput = async (text) => {
-    let built = '';
-    const words = text.split(' ');
-    setOutput('');
+    let built = "";
+    const words = text.split(" ");
+    setOutput("");
     for (const w of words) {
-      built += w + ' ';
+      built += w + " ";
       setOutput(built);
-      await new Promise(r => setTimeout(r, 14));
+      await new Promise((r) => setTimeout(r, 14));
     }
   };
 
@@ -214,9 +240,12 @@ OUTPUT RULES:
   };
 
   const clearAll = () => {
-    setInput(''); setOutput(''); setError(''); setProgress(0);
+    setInput("");
+    setOutput("");
+    setError("");
+    setProgress(0);
     setStats({ humanScore: 0, readability: 0, aiProbability: 0, wordCount: 0 });
-    setProcessStep('Ready');
+    setProcessStep("Ready");
   };
 
   const wordCount = input.split(/\s+/).filter(Boolean).length;
@@ -225,29 +254,43 @@ OUTPUT RULES:
   // ─── UI ───────────────────────────────────────────────────
   return (
     <div className="app-container">
-
       {/* ── Navbar ── */}
       <nav className="navbar">
         <div className="logo">
           <motion.span
             animate={{ rotate: isProcessing ? 360 : 0 }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-            style={{ display: 'inline-flex' }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            style={{ display: "inline-flex" }}
           >
             <Sparkles size={26} />
           </motion.span>
           Humanova<span style={{ opacity: 0.4 }}>.AI</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div className="processing-indicator">
-            <div className="status-dot" style={{
-              background: isProcessing
-                ? 'var(--warning)'
-                : hasKey ? 'var(--success)' : 'var(--error)'
-            }} />
-            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              {isProcessing ? processStep : hasKey ? 'Groq Connected' : 'No API Key'}
+            <div
+              className="status-dot"
+              style={{
+                background: isProcessing
+                  ? "var(--warning)"
+                  : hasKey
+                    ? "var(--success)"
+                    : "var(--error)",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                color: "var(--text-muted)",
+              }}
+            >
+              {isProcessing
+                ? processStep
+                : hasKey
+                  ? "Groq Connected"
+                  : "No API Key"}
             </span>
           </div>
 
@@ -266,8 +309,12 @@ OUTPUT RULES:
         {showSettings && (
           <motion.div
             className="modal-backdrop"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={e => e.target === e.currentTarget && setShowSettings(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={(e) =>
+              e.target === e.currentTarget && setShowSettings(false)
+            }
           >
             <motion.div
               className="modal-box"
@@ -276,8 +323,13 @@ OUTPUT RULES:
               exit={{ scale: 0.9, opacity: 0 }}
             >
               <div className="modal-header">
-                <h2><Settings size={18} /> API Configuration</h2>
-                <button className="btn-icon" onClick={() => setShowSettings(false)}>
+                <h2>
+                  <Settings size={18} /> API Configuration
+                </h2>
+                <button
+                  className="btn-icon"
+                  onClick={() => setShowSettings(false)}
+                >
                   <X size={18} />
                 </button>
               </div>
@@ -286,17 +338,45 @@ OUTPUT RULES:
                 <div className="api-badge free">100% FREE</div>
                 <h3>Groq Cloud API</h3>
                 <p>
-                  Groq provides <strong>free access</strong> to Llama 3.3 70B — a powerful
-                  AI model that rewrites your text to be undetectable. No credit card needed.
+                  Groq provides <strong>free access</strong> to Llama 3.3 70B —
+                  a powerful AI model that rewrites your text to be
+                  undetectable. No credit card needed.
                 </p>
 
-                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text)' }}>
+                <h4
+                  style={{
+                    fontSize: "0.85rem",
+                    marginBottom: "0.5rem",
+                    color: "var(--text)",
+                  }}
+                >
                   ⚡ Quick Setup (1 minute):
                 </h4>
-                <ol style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.8, paddingLeft: '1.2rem', marginBottom: '1rem' }}>
-                  <li>Go to <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="link-btn" style={{ display: 'inline', marginBottom: 0 }}>console.groq.com/keys <ExternalLink size={11} /></a></li>
+                <ol
+                  style={{
+                    fontSize: "0.82rem",
+                    color: "var(--text-muted)",
+                    lineHeight: 1.8,
+                    paddingLeft: "1.2rem",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <li>
+                    Go to{" "}
+                    <a
+                      href="https://console.groq.com/keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="link-btn"
+                      style={{ display: "inline", marginBottom: 0 }}
+                    >
+                      console.groq.com/keys <ExternalLink size={11} />
+                    </a>
+                  </li>
                   <li>Sign up with Google / GitHub (free)</li>
-                  <li>Click <strong>"Create API Key"</strong></li>
+                  <li>
+                    Click <strong>"Create API Key"</strong>
+                  </li>
                   <li>Copy it and paste below</li>
                 </ol>
 
@@ -305,21 +385,25 @@ OUTPUT RULES:
                   type="password"
                   placeholder="gsk_xxxxxxxxxxxxxxxxxxxx"
                   value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
+                  onChange={(e) => setApiKey(e.target.value)}
                   className="key-input"
                 />
               </div>
 
               <div className="warning-box">
                 <AlertTriangle size={15} />
-                Key is saved only in your browser's localStorage. Never shared externally.
+                Key is saved only in your browser's localStorage. Never shared
+                externally.
               </div>
 
               <motion.button
                 whileHover={{ scale: 1.02 }}
-                onClick={() => { setShowSettings(false); setError(''); }}
+                onClick={() => {
+                  setShowSettings(false);
+                  setError("");
+                }}
                 className="btn-primary"
-                style={{ marginTop: '1.5rem', width: '100%' }}
+                style={{ marginTop: "1.5rem", width: "100%" }}
               >
                 Save & Close
               </motion.button>
@@ -336,10 +420,12 @@ OUTPUT RULES:
             animate={{ opacity: 1, y: 0 }}
             className="hero-title"
           >
-            AI wrote it. <span style={{ color: 'var(--primary)' }}>Sajin Perfected it.</span>
+            AI wrote it.{" "}
+            <span style={{ color: "var(--primary)" }}>Sajin Perfected it.</span>
           </motion.h1>
           <p className="hero-subtitle">
-Paste your AI text — we give it emotions, personality, and a little human drama.
+            Paste your AI text — we give it emotions, personality, and a little
+            human drama.
           </p>
         </section>
 
@@ -360,13 +446,20 @@ Paste your AI text — we give it emotions, personality, and a little human dram
 
         {/* No key notice */}
         {!hasKey && (
-          <motion.div className="notice-banner" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Zap size={15} style={{ color: 'var(--warning)' }} />
+          <motion.div
+            className="notice-banner"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <Zap size={15} style={{ color: "var(--warning)" }} />
             <span>
-              No API key — running <strong>basic local mode</strong>.{' '}
-              <button className="link-inline" onClick={() => setShowSettings(true)}>
+              No API key — running <strong>basic local mode</strong>.{" "}
+              <button
+                className="link-inline"
+                onClick={() => setShowSettings(true)}
+              >
                 Add a free Groq key
-              </button>{' '}
+              </button>{" "}
               for real AI-powered humanization (100% human score).
             </span>
           </motion.div>
@@ -376,17 +469,21 @@ Paste your AI text — we give it emotions, personality, and a little human dram
           {/* ── Input ── */}
           <div className="input-group">
             <div className="label-row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
                 <Terminal size={15} /> Live Input
               </div>
-              <span className={isProcessing ? 'pulse' : ''}>{wordCount} words</span>
+              <span className={isProcessing ? "pulse" : ""}>
+                {wordCount} words
+              </span>
             </div>
 
             <div className="text-area-wrapper">
               <textarea
                 placeholder="Start typing or paste AI content (min 5 words)…"
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
               />
               {input && (
                 <button onClick={clearAll} className="clear-btn" title="Clear">
@@ -397,14 +494,30 @@ Paste your AI text — we give it emotions, personality, and a little human dram
 
             {/* Progress */}
             <div className="progress-box">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: "0.4rem",
+                }}
+              >
                 <span className="stat-label">Processing Power</span>
-                <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary)' }}>
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    color: "var(--primary)",
+                  }}
+                >
                   {Math.round(progress)}%
                 </span>
               </div>
               <div className="gauge-container">
-                <motion.div className="gauge-fill" animate={{ width: `${progress}%` }} transition={{ duration: 0.35 }} />
+                <motion.div
+                  className="gauge-fill"
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.35 }}
+                />
               </div>
             </div>
 
@@ -422,19 +535,34 @@ Paste your AI text — we give it emotions, personality, and a little human dram
           {/* ── Output ── */}
           <div className="output-group">
             <div className="label-row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+              >
                 <UserCheck size={15} /> Humanized Output
               </div>
               {output && (
                 <button onClick={copyToClipboard} className="btn-copy">
-                  {copied
-                    ? <><CheckCircle2 size={14} style={{ color: 'var(--success)' }} /> Copied!</>
-                    : <><Copy size={14} /> Copy</>}
+                  {copied ? (
+                    <>
+                      <CheckCircle2
+                        size={14}
+                        style={{ color: "var(--success)" }}
+                      />{" "}
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} /> Copy
+                    </>
+                  )}
                 </button>
               )}
             </div>
 
-            <div className="text-area-wrapper" style={{ background: 'rgba(99,102,241,0.04)', flex: 1 }}>
+            <div
+              className="text-area-wrapper"
+              style={{ background: "rgba(99,102,241,0.04)", flex: 1 }}
+            >
               <textarea
                 readOnly
                 placeholder="Humanized content streams here in real-time…"
@@ -444,21 +572,51 @@ Paste your AI text — we give it emotions, personality, and a little human dram
                 {isProcessing && !output && (
                   <motion.div
                     className="output-overlay"
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                   >
-                    <div style={{ textAlign: 'center', width: '65%' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', gap: 6 }}>
+                    <div style={{ textAlign: "center", width: "65%" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          marginBottom: "1rem",
+                          gap: 6,
+                        }}
+                      >
                         {[0, 0.15, 0.3].map((d, i) => (
-                          <motion.div key={i}
-                            animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
-                            transition={{ duration: 1, repeat: Infinity, delay: d }}
-                            style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--primary)' }}
+                          <motion.div
+                            key={i}
+                            animate={{
+                              scale: [1, 1.4, 1],
+                              opacity: [0.5, 1, 0.5],
+                            }}
+                            transition={{
+                              duration: 1,
+                              repeat: Infinity,
+                              delay: d,
+                            }}
+                            style={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              background: "var(--primary)",
+                            }}
                           />
                         ))}
                       </div>
-                      <p className="stat-label" style={{ marginBottom: '0.75rem' }}>{processStep}</p>
+                      <p
+                        className="stat-label"
+                        style={{ marginBottom: "0.75rem" }}
+                      >
+                        {processStep}
+                      </p>
                       <div className="gauge-container">
-                        <motion.div className="gauge-fill" animate={{ width: `${progress}%` }} />
+                        <motion.div
+                          className="gauge-fill"
+                          animate={{ width: `${progress}%` }}
+                        />
                       </div>
                     </div>
                   </motion.div>
@@ -468,15 +626,39 @@ Paste your AI text — we give it emotions, personality, and a little human dram
 
             <div className="stats-panel">
               {[
-                { label: 'AI Detection', value: output ? `${stats.aiProbability}%` : '--', bar: stats.aiProbability, color: output && stats.aiProbability === 0 ? 'var(--success)' : 'var(--text-muted)' },
-                { label: 'Human Score', value: output ? `${stats.humanScore}%` : '--', bar: stats.humanScore, color: output ? 'var(--success)' : 'var(--text-muted)' },
-                { label: 'Readability', value: output ? `${stats.readability}/100` : '--', bar: stats.readability, color: 'var(--primary)' },
-              ].map(s => (
+                {
+                  label: "AI Detection",
+                  value: output ? `${stats.aiProbability}%` : "--",
+                  bar: stats.aiProbability,
+                  color:
+                    output && stats.aiProbability === 0
+                      ? "var(--success)"
+                      : "var(--text-muted)",
+                },
+                {
+                  label: "Human Score",
+                  value: output ? `${stats.humanScore}%` : "--",
+                  bar: stats.humanScore,
+                  color: output ? "var(--success)" : "var(--text-muted)",
+                },
+                {
+                  label: "Readability",
+                  value: output ? `${stats.readability}/100` : "--",
+                  bar: stats.readability,
+                  color: "var(--primary)",
+                },
+              ].map((s) => (
                 <div className="stat-card" key={s.label}>
                   <div className="stat-label">{s.label}</div>
-                  <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
+                  <div className="stat-value" style={{ color: s.color }}>
+                    {s.value}
+                  </div>
                   <div className="gauge-container">
-                    <motion.div className="gauge-fill" animate={{ width: `${s.bar}%` }} transition={{ duration: 0.8 }} />
+                    <motion.div
+                      className="gauge-fill"
+                      animate={{ width: `${s.bar}%` }}
+                      transition={{ duration: 0.8 }}
+                    />
                   </div>
                 </div>
               ))}
@@ -485,11 +667,18 @@ Paste your AI text — we give it emotions, personality, and a little human dram
         </div>
 
         {/* Detectors badge */}
-        <section style={{ textAlign: 'center', marginTop: '2.5rem' }}>
+        <section style={{ textAlign: "center", marginTop: "2.5rem" }}>
           <div className="detectors-row">
-            {['GPTZero', 'Turnitin', 'Originality.ai', 'ZeroGPT', 'Copyleaks'].map(d => (
+            {[
+              "GPTZero",
+              "Turnitin",
+              "Originality.ai",
+              "ZeroGPT",
+              "Copyleaks",
+            ].map((d) => (
               <div key={d} className="detector-item">
-                <ShieldCheck size={17} style={{ color: 'var(--success)' }} /> {d}
+                <ShieldCheck size={17} style={{ color: "var(--success)" }} />{" "}
+                {d}
               </div>
             ))}
           </div>
