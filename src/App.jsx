@@ -8,19 +8,13 @@ import {
   Terminal,
   UserCheck,
   Eraser,
-  Settings,
-  X,
-  Key,
   AlertTriangle,
-  ExternalLink,
-  Zap,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────
-// FREE Groq API  –  gives access to Llama 3 models (free, fast)
-// Get your FREE key at: https://console.groq.com/keys
-// No credit card needed, generous free tier
+// Groq API key — hardcoded so no env setup needed on Vercel
 // ─────────────────────────────────────────────────────────────
+const GROQ_API_KEY = "REMOVED_API_KEY";
 
 export default function App() {
   const [input, setInput] = useState("");
@@ -30,10 +24,7 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [processStep, setProcessStep] = useState("Ready");
   const [error, setError] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(
-    () => localStorage.getItem("groq_api_key") || "",
-  );
+  const apiKey = GROQ_API_KEY;
   const [stats, setStats] = useState({
     humanScore: 0,
     readability: 0,
@@ -44,10 +35,7 @@ export default function App() {
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
 
-  // Persist key
-  useEffect(() => {
-    localStorage.setItem("groq_api_key", apiKey);
-  }, [apiKey]);
+
 
   // Real-time debounced trigger
   useEffect(() => {
@@ -249,7 +237,6 @@ OUTPUT RULES:
   };
 
   const wordCount = input.split(/\s+/).filter(Boolean).length;
-  const hasKey = !!apiKey;
 
   // ─── UI ───────────────────────────────────────────────────
   return (
@@ -272,11 +259,7 @@ OUTPUT RULES:
             <div
               className="status-dot"
               style={{
-                background: isProcessing
-                  ? "var(--warning)"
-                  : hasKey
-                    ? "var(--success)"
-                    : "var(--error)",
+                background: isProcessing ? "var(--warning)" : "var(--success)",
               }}
             />
             <span
@@ -286,131 +269,13 @@ OUTPUT RULES:
                 color: "var(--text-muted)",
               }}
             >
-              {isProcessing
-                ? processStep
-                : hasKey
-                  ? "Groq Connected"
-                  : "No API Key"}
+              {isProcessing ? processStep : "Groq Connected"}
             </span>
           </div>
-
-          <motion.button
-            whileHover={{ scale: 1.07 }}
-            onClick={() => setShowSettings(true)}
-            className="btn-settings"
-          >
-            <Key size={15} /> API Key
-          </motion.button>
         </div>
       </nav>
 
-      {/* ── Settings Modal ── */}
-      <AnimatePresence>
-        {showSettings && (
-          <motion.div
-            className="modal-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={(e) =>
-              e.target === e.currentTarget && setShowSettings(false)
-            }
-          >
-            <motion.div
-              className="modal-box"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-            >
-              <div className="modal-header">
-                <h2>
-                  <Settings size={18} /> API Configuration
-                </h2>
-                <button
-                  className="btn-icon"
-                  onClick={() => setShowSettings(false)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              <div className="api-section">
-                <div className="api-badge free">100% FREE</div>
-                <h3>Groq Cloud API</h3>
-                <p>
-                  Groq provides <strong>free access</strong> to Llama 3.3 70B —
-                  a powerful AI model that rewrites your text to be
-                  undetectable. No credit card needed.
-                </p>
-
-                <h4
-                  style={{
-                    fontSize: "0.85rem",
-                    marginBottom: "0.5rem",
-                    color: "var(--text)",
-                  }}
-                >
-                  ⚡ Quick Setup (1 minute):
-                </h4>
-                <ol
-                  style={{
-                    fontSize: "0.82rem",
-                    color: "var(--text-muted)",
-                    lineHeight: 1.8,
-                    paddingLeft: "1.2rem",
-                    marginBottom: "1rem",
-                  }}
-                >
-                  <li>
-                    Go to{" "}
-                    <a
-                      href="https://console.groq.com/keys"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="link-btn"
-                      style={{ display: "inline", marginBottom: 0 }}
-                    >
-                      console.groq.com/keys <ExternalLink size={11} />
-                    </a>
-                  </li>
-                  <li>Sign up with Google / GitHub (free)</li>
-                  <li>
-                    Click <strong>"Create API Key"</strong>
-                  </li>
-                  <li>Copy it and paste below</li>
-                </ol>
-
-                <label className="field-label">Your Groq API Key</label>
-                <input
-                  type="password"
-                  placeholder="gsk_xxxxxxxxxxxxxxxxxxxx"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="key-input"
-                />
-              </div>
-
-              <div className="warning-box">
-                <AlertTriangle size={15} />
-                Key is saved only in your browser's localStorage. Never shared
-                externally.
-              </div>
-
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                onClick={() => {
-                  setShowSettings(false);
-                  setError("");
-                }}
-                className="btn-primary"
-                style={{ marginTop: "1.5rem", width: "100%" }}
-              >
-                Save & Close
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Main ── */}
       <main className="main-content">
@@ -444,26 +309,7 @@ OUTPUT RULES:
           )}
         </AnimatePresence>
 
-        {/* No key notice */}
-        {!hasKey && (
-          <motion.div
-            className="notice-banner"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <Zap size={15} style={{ color: "var(--warning)" }} />
-            <span>
-              No API key — running <strong>basic local mode</strong>.{" "}
-              <button
-                className="link-inline"
-                onClick={() => setShowSettings(true)}
-              >
-                Add a free Groq key
-              </button>{" "}
-              for real AI-powered humanization (100% human score).
-            </span>
-          </motion.div>
-        )}
+
 
         <div className="humanizer-card">
           {/* ── Input ── */}
@@ -521,15 +367,7 @@ OUTPUT RULES:
               </div>
             </div>
 
-            {!hasKey && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                onClick={() => setShowSettings(true)}
-                className="btn-primary"
-              >
-                <Key size={16} /> Add Free Groq Key → Real Humanization
-              </motion.button>
-            )}
+
           </div>
 
           {/* ── Output ── */}
