@@ -31,17 +31,9 @@ export default function App() {
   const [processStep, setProcessStep] = useState("Ready");
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  // Permanent key from .env (VITE_GROQ_API_KEY), overridable via Settings modal
-  const ENV_KEY = import.meta.env.VITE_GROQ_API_KEY || "";
-  const [apiKey, setApiKey] = useState(() => {
-    const cached = localStorage.getItem("groq_api_key");
-    // Clear any stale/invalid key (must start with gsk_)
-    if (cached && !cached.startsWith("gsk_")) {
-      localStorage.removeItem("groq_api_key");
-      return ENV_KEY;
-    }
-    return cached || ENV_KEY;
-  });
+  const [apiKey, setApiKey] = useState(
+    () => localStorage.getItem("groq_api_key") || "",
+  );
   const [stats, setStats] = useState({
     humanScore: 0,
     readability: 0,
