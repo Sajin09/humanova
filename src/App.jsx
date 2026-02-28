@@ -32,7 +32,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [apiKey, setApiKey] = useState(
-    () => localStorage.getItem("groq_api_key") || "",
+    () =>
+      import.meta.env.VITE_GROQ_API_KEY ||
+      localStorage.getItem("groq_api_key") ||
+      "",
   );
   const [stats, setStats] = useState({
     humanScore: 0,
